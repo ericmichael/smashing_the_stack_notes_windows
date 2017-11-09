@@ -343,7 +343,7 @@ If there was, it would now be executed and your machine would be annihilated.
 
 If you open you program in a debugger (OllyDbg), you can find the memory location where the `small` array begins in function `bad()`. You can customize the return address to execute code beginning at that memory location utilizing the trick above.
 
-Then, instead of inserting "aaaabcccc" you can insert the bytes that represent machine code instructions (encoded as a string).
+Then, instead of inserting "AAAABCCCC" you can insert the bytes that represent machine code instructions (encoded as a string).
 
 
 
@@ -418,11 +418,11 @@ The program crashes. Notice EBP has been overwritten and EIP was partially overw
 
 We can try to overwrite EIP with exactly the memory location of our input string. If we can do that then we can replace our 'A's with virus code.
 
-![Crash Registers](crash_registers.png)
+![Crash Registers](images/crash_registers.png)
 
 Here is memory:
 
-![Crash Memory](crash_stack.png)
+![Crash Memory](images/crash_stack.png)
 
 
 
@@ -474,7 +474,7 @@ Why? Because ESP currently points to the location right after our string!
 
 Say What?
 
-![ESP](crash_memory2.png)
+![ESP](images/crash_memory2.png)
 
 Go look at the ESP register above and look what is on that line.
 
@@ -512,7 +512,7 @@ Lots of programs load helper libraries in the form of DLL files. Lets use one of
 
 Since these files are loaded in memory, you can overwrite the return address to execute any line of code in those DLL files.
 
-![EM](executable_modules.png)
+![EM](images/executable_modules.png)
 
 The base address for the EXE is at 00400000, no good.
 
@@ -582,7 +582,7 @@ My virus code simply encodes the machine code instructions to display a MessageB
 
 Don't worry, you are safe.
 
-![](hacked.png)
+![](images/hacked.png)
 
 
 
