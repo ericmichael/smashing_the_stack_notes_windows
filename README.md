@@ -574,6 +574,14 @@ subprocess.call(['bufferOverflow.exe', exploit])
 
 
 
+## Final Result
+
+Muahahhaha I have hacked your computer.
+
+My virus code simply encodes the machine code instructions to display a MessageBox.
+
+Don't worry, you are safe.
+
 ![](hacked.png)
 
 
@@ -590,9 +598,11 @@ subprocess.call(['bufferOverflow.exe', exploit])
 
    ​
 
-### Finding Virus Code
+### Finding More Virus Code
 
 You can find more virus code (not necessarily malicious) at https://www.exploit-db.com/shellcode/
+
+You can use your own payload instead of mine!
 
 
 
