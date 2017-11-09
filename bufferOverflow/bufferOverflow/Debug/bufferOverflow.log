@@ -1,0 +1,5 @@
+﻿  main.cpp
+c:\users\ericm\onedrive\documents\visual studio 2017\projects\bufferoverflow\bufferoverflow\main.cpp(11): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  c:\program files (x86)\windows kits\10\include\10.0.14393.0\ucrt\string.h(129): note: see declaration of 'strcpy'
+  bufferOverflow.vcxproj -> C:\Users\ericm\OneDrive\Documents\Visual Studio 2017\Projects\bufferOverflow\Debug\bufferOverflow.exe
+  bufferOverflow.vcxproj -> C:\Users\ericm\OneDrive\Documents\Visual Studio 2017\Projects\bufferOverflow\Debug\bufferOverflow.pdb (Partial PDB)
